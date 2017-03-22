@@ -22,12 +22,14 @@ public class GameManager : NetworkBehaviour
     public GameObject enemyPrefab;
     public GameObject bulletTrailPrefab;
 
-    float endGameCountdown = 5f;
     bool gameEnded = false;
     int winnerPlayer = 0;
     Vector3 targetCameraPosition;
 
     Camera observerCamera = null;
+
+    // Server only
+    float endGameCountdown = 5f;
 
     void Awake()
     {
@@ -38,19 +40,24 @@ public class GameManager : NetworkBehaviour
     {
         if (gameEnded)
         {
-            if (isClient && winnerPlayer != basePlayer.slot && observerCamera != null)
+            if (isClient)
             {
-                targetCameraPosition = enemies[winnerPlayer].transform.position + Vector3.up * 2 + enemies[winnerPlayer].transform.forward * 5;
-                observerCamera.transform.position = Vector3.MoveTowards(observerCamera.transform.position, targetCameraPosition, SMOOTHING * Time.deltaTime);
-                observerCamera.transform.LookAt(enemies[winnerPlayer].transform);
+                if (winnerPlayer != basePlayer.slot)
+                {
+                    targetCameraPosition = enemies[winnerPlayer].transform.position + Vector3.up * 2 + enemies[winnerPlayer].transform.forward * 5;
+                    observerCamera.transform.position = Vector3.MoveTowards(observerCamera.transform.position, targetCameraPosition, SMOOTHING * Time.deltaTime);
+                    observerCamera.transform.LookAt(enemies[winnerPlayer].transform);
+                }
             }
             if (isServer)
             {
                 if (endGameCountdown <= 0)
                 {
-                    NetworkManager.singleton.ServerChangeScene("Lobby");
+                    RpcSetCursorLock(false);
+                    playersInitialized = 0;
                     gameEnded = false;
                     endGameCountdown = 5f;
+                    NetworkManager.singleton.ServerChangeScene("Lobby");
                 }
                 else
                 {
@@ -74,7 +81,30 @@ public class GameManager : NetworkBehaviour
             }
             Debug.Log("Called RPC Initialize Stuff");
             RpcInitializeStuff(playersInitialized);
+            RpcSetCursorLock(true);
         }
+    }
+
+    [ClientRpc]
+    public void RpcSetCursorLock(bool lockState)
+    {
+        Dictionary<int, int> hash = new Dictionary<int, int>();
+        hash[4] = 4;
+        if (lockState)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+        }
+        else
+        {
+            Cursor.lockState = CursorLockMode.None;
+        }
+    }
+
+    [ClientRpc]
+    public void RpcEndGame()
+    {
+        observerCamera = null;
+        gameEnded = false;
     }
 
     [ClientRpc]
@@ -154,6 +184,7 @@ public class GameManager : NetworkBehaviour
     {
         gameEnded = true;
         winnerPlayer = playerSlot;
+        observerCamera.transform.position = basePlayer.transform.position;
         if (basePlayer.slot == winnerPlayer)
         {
             return;

@@ -23,8 +23,7 @@ public class PlayerScript : NetworkBehaviour
     private float healthRechargeTimer = 0;
     static float SENDRATE = 0.05f;
     private bool doRaycast = false;
-    private bool walking = false;
-    
+
     [Client]
     public override void OnStartLocalPlayer()
     {
@@ -65,6 +64,45 @@ public class PlayerScript : NetworkBehaviour
             CmdTransmitMyPosition(controlScript.transform.position, Quaternion.Euler(0, controlScript.camera.transform.eulerAngles.y, 0));
             sendTimer = 0;
         }
+        // TODO : Change this to transmit on change?
+        if (controlScript.onGround)
+        {
+            if (controlScript.crouching)
+            {
+                controlScript.animator.Play("GALCrouch");
+                CmdDoAnimation("Crouch");
+            }
+            else
+            {
+                if (controlScript.walking)
+                {
+                    if (health > 0)
+                    {
+                        CmdDoAnimation("Walk");
+                    }
+                    else
+                    {
+                        CmdDoAnimation("HappyWalk");
+                    }
+                }
+                else
+                {
+                    if (health > 0)
+                    {
+                        CmdDoAnimation("Idle");
+                    }
+                    else
+                    {
+                        controlScript.animator.Play("Happy");
+                        CmdDoAnimation("HappyIdle");
+                    }
+                }
+            }
+        }
+        else
+        {
+            CmdDoAnimation("Jump");
+        }
         if (health > 0)
         {
             if (Input.GetMouseButtonDown(0))
@@ -79,10 +117,6 @@ public class PlayerScript : NetworkBehaviour
                 }
             }
         }
-        else
-        {
-            controlScript.animator.Play("Happy");
-        }
         if (wave < maxWave)
         {
             wave += waveRechargeSpeed * Time.deltaTime;
@@ -90,30 +124,6 @@ public class PlayerScript : NetworkBehaviour
         else
         {
             wave = maxWave;
-        }
-        if (controlScript.bobTimer > 0 && !walking)
-        {
-            if (health > 0)
-            {
-                CmdDoAnimation("Walk");
-            }
-            else
-            {
-                CmdDoAnimation("HappyWalk");
-            }
-            walking = true;
-        }
-        else if (controlScript.bobTimer == 0 && walking)
-        {
-            if (health > 0)
-            {
-                CmdDoAnimation("Idle");
-            }
-            else
-            {
-                CmdDoAnimation("HappyIdle");
-            }
-            walking = false;
         }
     }
 
@@ -215,14 +225,15 @@ public class PlayerScript : NetworkBehaviour
             if (health <= 0)
             {
                 health = 0;
-                if (walking)
+                /*
+                if (controlScript.walking)
                 {
                     CmdDoAnimation("HappyWalk");
                 }
                 else
                 {
                     CmdDoAnimation("HappyIdle");
-                }
+                }*/
                 foreach (EnemyScript enemy in manager.enemies)
                 {
                     if (enemy != null)
